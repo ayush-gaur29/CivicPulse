@@ -1,19 +1,19 @@
 import React from "react";
-import { Clock, CheckCircle2, PlayCircle, AlertCircle, Sparkles } from "lucide-react";
+import { Clock, CheckCircle2, PlayCircle } from "lucide-react";
 
 export const StatusBadge = ({ status = "Pending", size = "md" }) => {
   const normalized = (status || "").toLowerCase().trim();
 
-  let colorClasses = "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20";
+  let colorClasses = "bg-amber-500/10 text-amber-300 border-amber-500/20";
   let Icon = Clock;
   let label = "Pending";
 
   if (normalized === "resolved") {
-    colorClasses = "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20";
+    colorClasses = "bg-emerald-500/10 text-emerald-300 border-emerald-500/20";
     Icon = CheckCircle2;
     label = "Resolved";
   } else if (normalized === "in progress" || normalized === "inprogress") {
-    colorClasses = "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20";
+    colorClasses = "bg-sky-500/10 text-sky-300 border-sky-500/20";
     Icon = PlayCircle;
     label = "In Progress";
   }
@@ -37,17 +37,17 @@ export const CategoryBadge = ({ category = "other", size = "md" }) => {
   const cat = (category || "").toLowerCase().trim();
 
   const config = {
-    road: { label: "Damaged Road", icon: "🚧", color: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/20" },
-    garbage: { label: "Garbage Overflow", icon: "🗑️", color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20" },
-    streetlight: { label: "Streetlight Issue", icon: "💡", color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border-yellow-500/20" },
-    water: { label: "Water Supply", icon: "💧", color: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20" },
-    other: { label: "Civic Issue", icon: "📋", color: "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20" },
+    road: { label: "Damaged Road", icon: "🚧", color: "bg-orange-500/10 text-orange-300 border-orange-500/20" },
+    garbage: { label: "Garbage Overflow", icon: "🗑️", color: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" },
+    streetlight: { label: "Streetlight Issue", icon: "💡", color: "bg-yellow-500/10 text-yellow-300 border-yellow-500/20" },
+    water: { label: "Water Supply", icon: "💧", color: "bg-blue-500/10 text-blue-300 border-blue-500/20" },
+    other: { label: "Civic Issue", icon: "📋", color: "bg-purple-500/10 text-purple-300 border-purple-500/20" },
   };
 
   const item = config[cat] || {
     label: category.charAt(0).toUpperCase() + category.slice(1),
     icon: "📌",
-    color: "bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/20",
+    color: "bg-slate-500/10 text-slate-300 border-slate-500/20",
   };
 
   const sizeClasses =
@@ -67,10 +67,10 @@ export const CategoryBadge = ({ category = "other", size = "md" }) => {
 
 export const Badge = ({ children, variant = "default", className = "" }) => {
   const variants = {
-    default: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700",
-    primary: "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-    success: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
-    warning: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+    default: "bg-slate-800 text-slate-300 border-slate-700",
+    primary: "bg-blue-950/60 text-cyan-300 border-blue-800",
+    success: "bg-emerald-950/60 text-emerald-300 border-emerald-800",
+    warning: "bg-amber-950/60 text-amber-300 border-amber-800",
   };
 
   return (
@@ -83,4 +83,3 @@ export const Badge = ({ children, variant = "default", className = "" }) => {
 };
 
 export default Badge;
-

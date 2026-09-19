@@ -8,9 +8,9 @@ export const Card = ({
 }) => {
   return (
     <div
-      className={`bg-white dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden ${
+      className={`bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm overflow-hidden text-slate-100 ${
         hoverEffect
-          ? "transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-slate-300 dark:hover:border-slate-700"
+          ? "transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-slate-700"
           : ""
       } ${className}`}
       {...props}
@@ -25,13 +25,13 @@ export const CardHeader = ({ children, className = "" }) => (
 );
 
 export const CardTitle = ({ children, className = "" }) => (
-  <h3 className={`text-lg font-bold text-slate-900 dark:text-slate-100 tracking-tight ${className}`}>
+  <h3 className={`text-lg font-bold text-slate-100 tracking-tight ${className}`}>
     {children}
   </h3>
 );
 
 export const CardDescription = ({ children, className = "" }) => (
-  <p className={`text-sm text-slate-500 dark:text-slate-400 mt-1 ${className}`}>
+  <p className={`text-sm text-slate-400 mt-1 ${className}`}>
     {children}
   </p>
 );

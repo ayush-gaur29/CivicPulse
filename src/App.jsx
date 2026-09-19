@@ -8,12 +8,14 @@ import Dashboard from "./Pages/Dashboard";
 import About from "./Pages/About";
 import { ThemeProvider } from "./Context/ThemeContext";
 import { ToastProvider } from "./Components/ui/Toast";
+import { NotificationProvider } from "./Context/NotificationContext";
 
 function App() {
   return (
     <ThemeProvider>
-      <ToastProvider>
-        <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200 selection:bg-blue-500/20 selection:text-blue-700 dark:selection:text-blue-300">
+      <NotificationProvider>
+        <ToastProvider>
+          <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-blue-500/20 selection:text-cyan-300">
           <Navbar />
           <main className="flex-1">
             <Routes>
@@ -25,9 +27,10 @@ function App() {
           </main>
           <Footer />
         </div>
-      </ToastProvider>
-    </ThemeProvider>
-  );
-}
+          </ToastProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    );
+  }
 
 export default App;

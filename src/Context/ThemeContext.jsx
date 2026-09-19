@@ -1,52 +1,25 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect } from "react";
 
 const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(() => {
-    return localStorage.getItem("civicpulse_theme") || "system";
-  });
-
-  const [resolvedTheme, setResolvedTheme] = useState("light");
-
   useEffect(() => {
+    // Enforce dark mode permanently across the entire application
     const root = document.documentElement;
+    root.classList.add("dark");
+    root.style.colorScheme = "dark";
 
-    const applyTheme = () => {
-      let isDark = false;
-      if (theme === "dark") {
-        isDark = true;
-      } else if (theme === "light") {
-        isDark = false;
-      } else {
-        // system
-        isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      }
-
-      if (isDark) {
-        root.classList.add("dark");
-        setResolvedTheme("dark");
-      } else {
-        root.classList.remove("dark");
-        setResolvedTheme("light");
-      }
-    };
-
-    applyTheme();
-    localStorage.setItem("civicpulse_theme", theme);
-
-    // If system, listen to media query changes
-    if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = () => applyTheme();
-      mediaQuery.addEventListener("change", handler);
-      return () => mediaQuery.removeEventListener("change", handler);
+    // Clean up any old light/system preference so the app is strictly dark
+    try {
+      localStorage.setItem("civicpulse_theme", "dark");
+    } catch {
+      // ignore
     }
-  }, [theme]);
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
+    <ThemeContext.Provider value={{ theme: "dark", resolvedTheme: "dark" }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -59,4 +32,3 @@ export const useTheme = () => {
   }
   return context;
 };
-
