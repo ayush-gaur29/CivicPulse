@@ -1,7 +1,33 @@
 import React, { useState } from "react";
-import { Send, MapPin, Camera } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  Send,
+  MapPin,
+  Camera,
+  User,
+  Mail,
+  FileText,
+  AlertCircle,
+  X,
+  Crosshair,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
+import { useToast } from "./ui/Toast";
+import Button from "./ui/Button";
+
+const ISSUE_TYPES = [
+  { id: "road", label: "Damaged Road / Pothole", icon: "🚧", desc: "Cracks, potholes, asphalt damage" },
+  { id: "garbage", label: "Garbage Overflow", icon: "🗑️", desc: "Uncollected trash, illegal dumping" },
+  { id: "streetlight", label: "Streetlight Issue", icon: "💡", desc: "Non-functional or flickering lights" },
+  { id: "water", label: "Water Supply Problem", icon: "💧", desc: "Pipeline burst, low pressure, contamination" },
+  { id: "other", label: "Other Civic Concern", icon: "📋", desc: "Public property, parks, drainage" },
+];
 
 const IssueForm = () => {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -9,207 +35,429 @@ const IssueForm = () => {
     location: "",
     description: "",
     image: null,
+    imagePreview: null,
   });
 
-  // Handle input change
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Handle standard input change
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-    setFormData({
-      ...formData,
-      [name]: files ? files[0] : value,
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  // Submit handler
+  // Handle Image File Conversion to Base64 (so it persists across page reloads in localStorage)
+  const processImageFile = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showToast("Please upload an image file (PNG, JPG, JPEG, WEBP)", "error");
+      return;
+    }
+    // Limit to 4MB
+    if (file.size > 4 * 1024 * 1024) {
+      showToast("Image size should be under 4MB", "warning");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFormData((prev) => ({
+        ...prev,
+        image: file,
+        imagePreview: event.target.result,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) processImageFile(file);
+  };
+
+  const removeImage = () => {
+    setFormData((prev) => ({
+      ...prev,
+      image: null,
+      imagePreview: null,
+    }));
+  };
+
+  // Drag & drop handlers
+  const handleDrag = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processImageFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  // Browser Geolocation Detector
+  const handleDetectLocation = () => {
+    if (!navigator.geolocation) {
+      showToast("Geolocation is not supported by your browser", "error");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const formatted = `GPS: ${latitude.toFixed(4)}° N, ${longitude.toFixed(4)}° E`;
+        setFormData((prev) => ({
+          ...prev,
+          location: prev.location ? `${prev.location} (${formatted})` : formatted,
+        }));
+        setIsLocating(false);
+        showToast("Location detected successfully!", "success");
+      },
+      (error) => {
+        setIsLocating(false);
+        let msg = "Could not retrieve your location.";
+        if (error.code === error.PERMISSION_DENIED) {
+          msg = "Location permission was denied. Please enter manually.";
+        }
+        showToast(msg, "warning");
+      },
+      { timeout: 10000 }
+    );
+  };
+
+  // Submit Handler
   const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!formData.issueType) {
-      alert("⚠️ Please select a valid issue type.");
+      showToast("Please select the type of civic issue.", "warning");
       return;
     }
 
-    // Get existing issues from localStorage
-    const existing = JSON.parse(localStorage.getItem("issues")) || [];
+    if (!formData.location.trim()) {
+      showToast("Please provide the issue location.", "warning");
+      return;
+    }
 
-    // Create new issue object
-    const newIssue = {
-      id: Date.now(),
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      issueType: formData.issueType || "other",
-      location: formData.location.trim(),
-      description: formData.description.trim(),
-      status: "Pending",
-      createdAt: new Date().toLocaleString(),
-      imageUrl: formData.image ? URL.createObjectURL(formData.image) : null,
-    };
+    setIsSubmitting(true);
 
-    // Save updated list
-    localStorage.setItem("issues", JSON.stringify([...existing, newIssue]));
+    try {
+      const existing = JSON.parse(localStorage.getItem("issues")) || [];
 
-    alert("✅ Issue submitted successfully!");
+      const newIssue = {
+        id: Date.now(),
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        issueType: formData.issueType || "other",
+        location: formData.location.trim(),
+        description: formData.description.trim(),
+        status: "Pending",
+        createdAt: new Date().toLocaleString(),
+        imageUrl: formData.imagePreview || null,
+      };
 
-    // Reset form
-    setFormData({
-      name: "",
-      email: "",
-      issueType: "",
-      location: "",
-      description: "",
-      image: null,
-    });
+      localStorage.setItem("issues", JSON.stringify([newIssue, ...existing]));
+
+      showToast("Issue submitted successfully! Authorities have been notified.", "success");
+
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        issueType: "",
+        location: "",
+        description: "",
+        image: null,
+        imagePreview: null,
+      });
+
+      setIsSubmitting(false);
+
+      // Optional smooth redirect to dashboard after brief delay
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1200);
+    } catch (err) {
+      setIsSubmitting(false);
+      showToast("Failed to submit issue. Please try again.", "error");
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950 py-10 px-5 transition-colors duration-500">
-      <div className="max-w-3xl w-full bg-white dark:bg-gray-900 shadow-lg rounded-2xl p-8 transition-all duration-300">
-        {/* Header */}
-        <div className="flex items-center space-x-3 mb-6">
-          <MapPin className="text-blue-600 dark:text-emerald-400" size={28} />
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-            Report a Local Issue
-          </h2>
+    <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-sm p-6 sm:p-8 md:p-10 transition-colors">
+      <div className="border-b border-slate-100 dark:border-slate-800 pb-6 mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-cyan-400 flex items-center justify-center">
+            <MapPin className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Report a Civic Issue
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              Submit your report with precise location and photo evidence for swift civic action.
+            </p>
+          </div>
         </div>
+      </div>
 
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          Help improve your community by reporting local issues. Our civic
-          authorities will review and act promptly.
-        </p>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Section 1: Citizen Contact */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+            <User className="w-3.5 h-3.5" />
+            <span>1. Reporter Information</span>
+          </h3>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Name + Email */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Your Name
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Full Name <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                placeholder="e.g. Ayush Gaur"
-                className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 
-                bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-400"
-              />
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  placeholder="e.g. Ayush Gaur"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-cyan-400 transition"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Email Address
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Email Address <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                placeholder="e.g. ayush@example.com"
-                className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 
-                bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 
-                focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-400"
-              />
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  placeholder="e.g. ayush@example.com"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-cyan-400 transition"
+                />
+              </div>
             </div>
           </div>
+        </div>
 
-          {/* Issue Type */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Type of Issue
-            </label>
-            <select
-              name="issueType"
-              value={formData.issueType}
-              onChange={handleChange}
-              required
-              className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 
-              bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 
-              focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-400"
-            >
-              <option value="">Select an issue type</option>
-              <option value="road">🚧 Damaged Road</option>
-              <option value="garbage">🗑️ Garbage Overflow</option>
-              <option value="streetlight">💡 Streetlight Issue</option>
-              <option value="water">💧 Water Supply Problem</option>
-              <option value="other">📋 Other</option>
-            </select>
+        {/* Section 2: Issue Type */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>2. Select Issue Category</span>
+            </h3>
+            <span className="text-xs text-rose-500 font-semibold">* Required</span>
           </div>
 
-          {/* Location */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Location
-            </label>
-            <input
-              type="text"
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              required
-              placeholder="e.g. Sector 14, Gurgaon"
-              className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 
-              bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 
-              focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-400"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ISSUE_TYPES.map((type) => {
+              const isSelected = formData.issueType === type.id;
+              return (
+                <button
+                  type="button"
+                  key={type.id}
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, issueType: type.id }))
+                  }
+                  className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                    isSelected
+                      ? "border-blue-600 dark:border-cyan-400 bg-blue-50/50 dark:bg-cyan-950/20 ring-2 ring-blue-500/20 shadow-xs"
+                      : "border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-white dark:bg-slate-800/40"
+                  }`}
+                >
+                  <span className="text-2xl shrink-0">{type.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      className={`text-xs font-bold truncate ${
+                        isSelected
+                          ? "text-blue-700 dark:text-cyan-300"
+                          : "text-slate-900 dark:text-slate-100"
+                      }`}
+                    >
+                      {type.label}
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
+                      {type.desc}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Section 3: Location */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+              <MapPin className="w-3.5 h-3.5" />
+              <span>3. Location Details</span>
+            </h3>
           </div>
 
-          {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Description
-            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  required
+                  placeholder="e.g. Sector 14, Main Market Road, Gurgaon"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-cyan-400 transition"
+                />
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDetectLocation}
+                disabled={isLocating}
+                className="shrink-0"
+                icon={
+                  isLocating ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  ) : (
+                    <Crosshair className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
+                  )
+                }
+              >
+                <span className="hidden sm:inline">Use My GPS</span>
+              </Button>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+              Include landmark, street name, or nearby store for faster identification.
+            </p>
+          </div>
+        </div>
+
+        {/* Section 4: Description */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5" />
+            <span>4. Detailed Description</span>
+          </h3>
+
+          <div>
             <textarea
               name="description"
               value={formData.description}
               onChange={handleChange}
-              rows="4"
+              rows={4}
               required
-              placeholder="Describe the issue briefly..."
-              className="w-full p-2.5 rounded-lg border border-gray-300 dark:border-gray-700 
-              bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-200 
-              focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-emerald-400"
-            ></textarea>
+              placeholder="Describe the issue in detail (e.g. depth of pothole, duration of problem, hazard risk to pedestrians)..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-cyan-400 transition"
+            />
           </div>
+        </div>
 
-          {/* Image Upload */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-              Upload Photo (optional)
-            </label>
-            <div className="flex items-center space-x-3">
-              <label className="cursor-pointer flex items-center space-x-2 text-blue-600 dark:text-emerald-400 hover:underline">
-                <Camera size={20} />
-                <span>Choose File</span>
-                <input
-                  type="file"
-                  name="image"
-                  accept="image/*"
-                  onChange={handleChange}
-                  className="hidden"
-                />
-              </label>
-              {formData.image && (
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {formData.image.name}
+        {/* Section 5: Photo Upload */}
+        <div className="space-y-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-2">
+            <Camera className="w-3.5 h-3.5" />
+            <span>5. Photo Evidence (Optional but Recommended)</span>
+          </h3>
+
+          {!formData.imagePreview ? (
+            <div
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors cursor-pointer ${
+                dragActive
+                  ? "border-blue-500 bg-blue-50/50 dark:bg-blue-950/30"
+                  : "border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600 bg-slate-50/50 dark:bg-slate-800/30"
+              }`}
+            >
+              <input
+                type="file"
+                id="photo-upload"
+                name="image"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <label
+                htmlFor="photo-upload"
+                className="cursor-pointer flex flex-col items-center justify-center space-y-2"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shadow-xs text-blue-600 dark:text-cyan-400">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  Click to upload <span className="text-slate-500 font-normal">or drag & drop</span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  PNG, JPG, or WEBP up to 4MB
                 </p>
-              )}
+              </label>
             </div>
-          </div>
+          ) : (
+            <div className="relative rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800 p-2 flex items-center gap-4">
+              <img
+                src={formData.imagePreview}
+                alt="Upload preview"
+                className="w-20 h-20 object-cover rounded-xl border border-slate-200 dark:border-slate-700"
+              />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {formData.image?.name || "Uploaded Photo"}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Photo ready for submission
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={removeImage}
+                className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition mr-2"
+                title="Remove photo"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
 
-          {/* Submit Button */}
-          <button
+        {/* Action Button */}
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+          <Button
             type="submit"
-            className="flex items-center justify-center gap-2 bg-blue-600 dark:bg-emerald-500 text-white font-semibold w-full py-2.5 rounded-lg hover:bg-blue-700 dark:hover:bg-emerald-600 transition-all duration-300 shadow-md"
+            size="lg"
+            isLoading={isSubmitting}
+            className="w-full shadow-md shadow-blue-500/25"
+            icon={<Send className="w-4 h-4" />}
           >
-            <Send size={18} />
-            Submit Issue
-          </button>
-        </form>
-      </div>
+            {isSubmitting ? "Submitting Issue..." : "Submit Civic Issue"}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 };
